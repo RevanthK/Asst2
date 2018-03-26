@@ -2,14 +2,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <unistd.h>
 #include <ctype.h>
 #include <dirent.h>
 #include "invertedIndex.h"
 
 
 //Converts nonalphanumeric into alphanumeric
-void tokenize(char* str){
+void wordize(char* str){
 
  char* letters;
 
@@ -49,44 +48,45 @@ void tokenize(char* str){
 
 }
 
-HashToken* createHashToken(char* token, char* filename){
+hashID* createhashID(char* word, char* filename){
 
-    HashToken* HT = (HashToken*) malloc(sizeof(HashToken));
+    hashID* HT = (hashID*) malloc(sizeof(hashID));
 
-    //HT->token = (char*)malloc((sizeof(char)*strlen(token) + 1));
-    HT->token = (char*)malloc((sizeof(char)*strlen(token)));
+    //HT->word = (char*)malloc((sizeof(char)*strlen(word) + 1));
+    HT->word = (char*)malloc((sizeof(char)*strlen(word)));
     
-    strcpy(HT->token, token);
+    strcpy(HT->word, word);
 
-    HT->head_fd = createFileData(token, filename, 1);
+    HT->parent_fData = createfData(word, filename, 1);
     HT->next = NULL;
 
     return HT;
 }
 
-FileData* createFileData(char* token, char* filename, int token_count){
+fData* createfData(char* word, char* filename, int count){
 
-    FileData* FD = (FileData*)malloc(sizeof(FileData));
+    fData* FD = (fData*)malloc(sizeof(fData));
 
-    FD->token = (char*)malloc((sizeof(char) * strlen(token)+1));
-    strcpy(FD->token, token);
+
+    FD->word = (char*)malloc((sizeof(char) * strlen(word)+1));
+    strcpy(FD->word, word);
 
     // FD->filename = (char*)malloc( (sizeof(char) * strlen(filename)+1));
     FD->filename = (char*)malloc( (sizeof(char) * strlen(filename)));
     
     strcpy(FD->filename, filename);
 
-    FD->token_count = token_count;
+    FD->count = count;
     FD->next_fd=NULL;
 
     return FD;
 }
 
-TokenList* createTokenList(int tok_amount, char** unsort_tokens, char* filename){
-    TokenList* newTL = (TokenList*)malloc(sizeof(TokenList));
+wordList* createwordList(int wrd_amount, char** unsort_words, char* filename){
+    wordList* newTL = (wordList*)malloc(sizeof(wordList));
     
-    newTL->tok_amount = tok_amount;
-    newTL->unsort_tokens = unsort_tokens;
+    newTL->wrd_amount = wrd_amount;
+    newTL->unsort_words = unsort_words;
     
     //newTL->filename = (char*)malloc((sizeof(char)*strlen(filename) + 1));
     newTL->filename = (char*)malloc((sizeof(char)*strlen(filename)));
@@ -154,8 +154,8 @@ int compare_str(char* a, char* b){
     return weight;
 }
 
-//get tokens out of string (string comes from a file)
-TokenList* split(char* str, char* filename){
+//get words out of string (string comes from a file)
+wordList* split(char* str, char* filename){
     
     if(str == NULL){
         printf("STRING IS NULL:");
@@ -224,7 +224,7 @@ TokenList* split(char* str, char* filename){
         //printf("%.*s\n", interval, str + inter_tab[i][0]);//test purposes
     }
     
-    return createTokenList(word_count, alphas, filename); //return struct with tokens and amount
+    return createwordList(word_count, alphas, filename); //return struct with words and amount
 }
 
 //returns the size of a function
@@ -276,11 +276,11 @@ int hashId(char c){
     exit(EXIT_FAILURE);
 }
 
-//hash table where all tokens will be stored
-void addToken(char* token, char* filename){
+//hash table where all words will be stored
+void addToken(char* word, char* filename){
     
-    if(token == NULL){
-        printf("ERROR - addToken: token is NULL");
+    if(word == NULL){
+        printf("ERROR - addToken: word is NULL");
         exit(EXIT_FAILURE);
     }
     else if(filename == NULL){
@@ -289,20 +289,20 @@ void addToken(char* token, char* filename){
     }
 
     //get hashid of index
-    int index = hashId(token[0]);
-    HashToken* itr;
+    int index = hashId(word[0]);
+    hashID* itr;
     
-    //loop through mapped token_table index and see if the token is in the list
-    for(itr = token_table[index]; itr!=NULL; itr = itr->next){
-        //if the token is in the list
-        if(strcmp(itr->token, token) == 0){
+    //loop through mapped hashTable index and see if the word is in the list
+    for(itr = hashTable[index]; itr!=NULL; itr = itr->next){
+        //if the word is in the list
+        if(strcmp(itr->word, word) == 0){
 
             //check to see if the file name is in the filename list
-            FileData* fileItr;
-            for(fileItr = itr->head_fd; fileItr!=NULL; fileItr = fileItr->next_fd){
+            fData* fileItr;
+            for(fileItr = itr->parent_fData; fileItr!=NULL; fileItr = fileItr->next_fd){
                 //if the file is already in the list
                 if(strcmp(fileItr->filename, filename)==0){
-                    fileItr->token_count++;
+                    fileItr->count++;
                     return;
                 }      
             }
@@ -310,35 +310,35 @@ void addToken(char* token, char* filename){
     }
 
     //if there at this index in the hashtable, add to the hashtable and return
-    if(token_table[index] == NULL){
-        token_table[index] = createHashToken(token, filename);
+    if(hashTable[index] == NULL){
+        hashTable[index] = createhashID(word, filename);
         return;
     }
 
     //if the new node being added is greater than the first node
-    else if(token_table[index]!=NULL && 
-            compare_str(token ,token_table[index]->token)<0){
+    else if(hashTable[index]!=NULL && 
+            compare_str(word ,hashTable[index]->word)<0){
         
-        HashToken* temp = token_table[index];
-        token_table[index] = createHashToken(token, filename);
-        token_table[index]->next = temp;
+        hashID* temp = hashTable[index];
+        hashTable[index] = createhashID(word, filename);
+        hashTable[index]->next = temp;
         return;
     }
 
-    //if the token is in the hastable, but the filename isn't
+    //if the word is in the hastable, but the filename isn't
     else{
-        HashToken* ptr=NULL;
+        hashID* ptr=NULL;
         
-        //loop over the table to fin token
-        for(ptr = token_table[index]; ptr!=NULL; ptr = ptr->next){
+        //loop over the table to fin word
+        for(ptr = hashTable[index]; ptr!=NULL; ptr = ptr->next){
             
-            //if the token is in the list, add the filename if different
-            if(strcmp(ptr->token, token)==0){
+            //if the word is in the list, add the filename if different
+            if(strcmp(ptr->word, word)==0){
                  
-                FileData* itr = NULL;
+                fData* itr = NULL;
 
                 //loop through the files
-                for(itr=ptr->head_fd; itr!=NULL; itr=itr->next_fd){
+                for(itr=ptr->parent_fData; itr!=NULL; itr=itr->next_fd){
                     
                     //append the list using alphanumerics
                     if(itr->next_fd != NULL &&
@@ -346,8 +346,8 @@ void addToken(char* token, char* filename){
                         compare_str(filename, itr->next_fd->filename)<0){
                         
                         //insert into the middle of the linked list
-                        FileData* temp = itr->next_fd;
-                        itr->next_fd = createFileData(token, filename, 1);
+                        fData* temp = itr->next_fd;
+                        itr->next_fd = createfData(word, filename, 1);
                         itr->next_fd->next_fd = temp;
 
                         //done inserting, so just return
@@ -356,39 +356,39 @@ void addToken(char* token, char* filename){
                     
                     //if we get to the last position, append to the end and return
                     else if(itr->next_fd == NULL){
-                        itr->next_fd = createFileData(token, filename, 1);
+                        itr->next_fd = createfData(word, filename, 1);
                         return;
                     }
                 }
             }             
         
-            //if the token isn't in the list
+            //if the word isn't in the list
             //and we are in the middle of the list based on alphabetic
             else if(ptr->next != NULL &&
-                    compare_str(token, ptr->token) > 0 &&
-                    compare_str(token, ptr->next->token)<0){
+                    compare_str(word, ptr->word) > 0 &&
+                    compare_str(word, ptr->next->word)<0){
                 
                 //append to the middle 
-                HashToken* temp = ptr->next;
-                ptr->next = createHashToken(token, filename);
+                hashID* temp = ptr->next;
+                ptr->next = createhashID(word, filename);
                 ptr->next->next = temp;
 
                 return;
             }
 
-            //done check to see if new token belongs at the end,
+            //done check to see if new word belongs at the end,
             //just kind of hoping that if all other conditions aren't met,
             //we can just add it to the end
             else if(ptr->next == NULL){
 
-                ptr->next = createHashToken(token, filename);
+                ptr->next = createhashID(word, filename);
                 return;
             }
         }
     }
 } 
 
-//goes through all the tokens in the token table and prints out the data
+//goes through all the words in the word table and prints out the data
 void printTokenTable(){
     //loop through alphabet
     int i = -1;
@@ -396,18 +396,18 @@ void printTokenTable(){
         
         printf("INDEX: [%c]\n", 'a'+i);
 
-        //loop through tokens in hashtable
-        HashToken* itr = NULL;
-        for(itr = token_table[i]; itr!=NULL; itr=itr->next){
+        //loop through words in hashtable
+        hashID* itr = NULL;
+        for(itr = hashTable[i]; itr!=NULL; itr=itr->next){
             
-            printf("\tToken: %s\n",itr->token);
+            printf("\tToken: %s\n",itr->word);
             
-            //loop through files in each token
-            FileData* ptr = NULL;
+            //loop through files in each word
+            fData* ptr = NULL;
             int count=0;
-            FileData* sorted = sortFileData(itr->head_fd);
+            fData* sorted = sortfData(itr->parent_fData);
             for(ptr=sorted; ptr!=NULL; ptr=ptr->next_fd, count++){
-                printf("\t\t%d. Filename: %s\n\t\tTokenCount: %d\n",count, ptr->filename, ptr->token_count);
+                printf("\t\t%d. Filename: %s\n\t\tTokenCount: %d\n",count, ptr->filename, ptr->count);
             }
         }
     }
@@ -415,61 +415,104 @@ void printTokenTable(){
 
 
 
-void listdir(const char *name, int level){
+void findDirectories(const char *name, int level){
+
     DIR *dir;
     struct dirent *entry;
 
-    if(!(dir = opendir(name)))
+    if(!(dir = opendir(name))){
         return;
-    if(!(entry = readdir(dir)))
+    }
+    
+    if(!(entry = readdir(dir))){       
         return;
+    }
+    /*
+    printf("print files:\n");
 
+    struct dirent *ent;
+
+  /* print all the files and directories within directory */
+    /*
+    while ((ent = readdir (dir)) != NULL) {
+        char path[1000];
+        int len = snprintf(path, sizeof(path)-1, "%s/%s", name, entry->d_name);
+        path[len] = 0;
+        
+        if(isDirectory(path)){
+            printf ("dir: %s\n", ent->d_name);
+        }
+        else{
+            printf ("file %s\n", ent->d_name);
+        }
+
+
+    }
+*/
+
+    
     do{
         //if the FD is a directory, recurse
         if(entry->d_type == DT_DIR){
-            char path[1024];
+            //printf("%d- %s\n", level*2, name);
+
+            //printf("%s\n", name);
+            //printf("%s\n", entry->d_name);
+
+
+
+
+            char path[1000];
             int len = snprintf(path, sizeof(path)-1, "%s/%s", name, entry->d_name);
             path[len] = 0;
-            
-            if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
-                continue;
 
-            //printf("%*s[%s]\n", level*2, "", entry->d_name);
-            listdir(path, level + 1);
+
+            printf("%s\n", path);
+            
+            if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0){
+                
+                continue;
+            }
+
+
+
+            findDirectories(path, level + 1);
         }
         //else if it is a file
         else{
             //create full path to file to be read
-            char path[1024];
+            char path[1000];
             int len = snprintf(path, sizeof(path)-1, "%s/%s", name, entry->d_name);
             path[len] = 0;
             
             //read and get it as a string
             char* fileTokens = readfile(path);
 
-            //get all the tokens as a list and store the filename
-            TokenList* tokenList = split(fileTokens, entry->d_name);
+            //get all the words as a list and store the filename
+            wordList* wordList = split(fileTokens, entry->d_name);
 
-            int amount = tokenList->tok_amount;
-            char* filename = tokenList->filename;
+            int amount = wordList->wrd_amount;
+            char* filename = wordList->filename;
 
             int i;
             for(i=0; i<amount; i++){
-                char* token = tokenList->unsort_tokens[i];
-                addToken(token, filename);        
+                char* word = wordList->unsort_words[i];
+                addToken(word, filename);        
             }
 
-                //delete the token list
-                for(i=0; i<tokenList->tok_amount; i++){
-                    free(tokenList->unsort_tokens[i]);
+                //delete the word list
+                for(i=0; i<wordList->wrd_amount; i++){
+                    free(wordList->unsort_words[i]);
                 }
-                free(tokenList->filename);
-                free(tokenList);
+                free(wordList->filename);
+                free(wordList);
 
 
-            printf("%*s- %s\n", level*2, "", entry->d_name);//prints for testing purposes
+            //printf("%*s- %s\n", level*2, "", entry->d_name);//prints for testing purposes
         }
     } while(entry == readdir(dir));
+    
+
     closedir(dir);
 }
 
@@ -479,20 +522,20 @@ void writeToXML(FILE* fp){
     fprintf(fp,"<fileIndex>\n"); 
     
     //loop through alphabet
-    int i = -1;
+    int i;
     for(i=0; i<26; i++){ 
-        //loop through tokens in hashtable
-        HashToken* itr = NULL;
-        for(itr = token_table[i]; itr!=NULL; itr=itr->next){
-            //loop through files in each token
+        //loop through words in hashtable
+        hashID* itr = NULL;
+        for(itr = hashTable[i]; itr!=NULL; itr=itr->next){
+            //loop through files in each word
             
-            fprintf(fp, "\t<word text=\"%s\">\n", itr->token); 
-            FileData* ptr = NULL;
+            fprintf(fp, "\t<word text=\"%s\">\n", itr->word); 
+            fData* ptr = NULL;
             int count=0;
              
-            FileData* sorted = sortFileData(itr->head_fd);
+            fData* sorted = sortfData(itr->parent_fData);
             for(ptr=sorted; ptr!=NULL; ptr=ptr->next_fd, count++){
-                fprintf(fp, "\t\t<file name=\"%s\">%d</file>\n",ptr->filename, ptr->token_count);
+                fprintf(fp, "\t\t<file name=\"%s\">%d</file>\n",ptr->filename, ptr->count);
             }
             fprintf(fp,"\t</word>\n");
         }
@@ -501,12 +544,12 @@ void writeToXML(FILE* fp){
     fprintf(fp,"</fileIndex>");
 }
 
-//sort the FileData linked list that is located within each token
-FileData* sortFileData(FileData* head){
+//sort the fData linked list that is located within each word
+fData* sortfData(fData* head){
         
-    FileData* newHead = NULL;
+    fData* newHead = NULL;
 
-    FileData* ptr = NULL;
+    fData* ptr = NULL;
     for(ptr = head; ptr!= NULL; /*ptr=ptr->next_fd*/){
         
         //if the head is null, add the first element, and disconnect the ptr from the list
@@ -518,10 +561,10 @@ FileData* sortFileData(FileData* head){
             continue;
         }
         
-        //if the token count of a word is greater than the current largest
+        //if the word count of a word is greater than the current largest
         //ADD TO FRONT
-        else if(newHead->token_count < ptr->token_count){
-            FileData* temp = newHead; //store a reference to newHead
+        else if(newHead->count < ptr->count){
+            fData* temp = newHead; //store a reference to newHead
             newHead = ptr; //make newHead equal to the new larger ptr
             ptr = ptr->next_fd;//make ptr move forward
             newHead->next_fd = temp;// link back together the sorted list
@@ -529,10 +572,10 @@ FileData* sortFileData(FileData* head){
             continue;
         }
 
-        else if(newHead->token_count == ptr->token_count && 
+        else if(newHead->count == ptr->count && 
                 compare_str(ptr->filename, newHead->filename) < 0){
                 
-            FileData* temp = newHead; //store a reference to newHead
+            fData* temp = newHead; //store a reference to newHead
             newHead = ptr; //make newHead equal to the new larger ptr
             ptr = ptr->next_fd;//make ptr move forward
             newHead->next_fd = temp;// link back together the sorted list
@@ -542,16 +585,16 @@ FileData* sortFileData(FileData* head){
         
         //ADD TO CENTER & END
         else{
-            FileData* itr = NULL;
+            fData* itr = NULL;
             for(itr = newHead; itr!=NULL; itr=itr->next_fd){
                 
-                //if the token frequency is greater than the head of the
+                //if the word frequency is greater than the head of the
                 //FREQUENCY MIDDLE
                 if(itr->next_fd != NULL &&
-                        itr->token_count > ptr->token_count &&
-                        ptr->token_count > itr->next_fd->token_count){
+                        itr->count > ptr->count &&
+                        ptr->count > itr->next_fd->count){
                    
-                    FileData* temp = itr->next_fd;
+                    fData* temp = itr->next_fd;
                     itr->next_fd = ptr;
                     ptr = ptr->next_fd;
                     itr->next_fd->next_fd= temp;
@@ -560,13 +603,13 @@ FileData* sortFileData(FileData* head){
                     break;
                 }
                 
-                //else if the token frequency is the same
+                //else if the word frequency is the same
                 //ADD TO MIDDLE (FRONT OF FREQUENCY LIST)
                 else if(itr->next_fd!= NULL && 
-                        itr->next_fd->token_count == ptr->token_count &&
+                        itr->next_fd->count == ptr->count &&
                         compare_str(ptr->filename, itr->next_fd->filename) < 0){
                    
-                    FileData* temp = itr->next_fd;
+                    fData* temp = itr->next_fd;
                     itr->next_fd = ptr;
                     ptr = ptr->next_fd;
                     itr->next_fd->next_fd= temp;
@@ -603,8 +646,8 @@ return 1;
 }
 else{
 
-char indexFileName[1024];
-char dirFileName[1024];
+char indexFileName[1000];
+char dirFileName[1000];
 
 /*
  char *indexFileName = (char*)malloc(sizeof(argv[1])+sizeof(char));
@@ -640,7 +683,7 @@ char dirFileName[1024];
     }
 
  
-TokenList* tokenList = NULL;
+wordList* wordList = NULL;
 DIR* dir;
 struct dirent* entry;
 
@@ -670,34 +713,34 @@ if(!(dir = opendir(dirFileName))){
                     if(((int)dirFileName[itr]) - ((int)'/') == 0)
                         break;
                 
-                //Call TokenList with the correct size
+                //Call wordList with the correct size
                 if(itr == 0)
-                    tokenList = split(fileTokens, dirFileName);
+                    wordList = split(fileTokens, dirFileName);
                 else{
                     char* realFilename = (char*)malloc((sizeof(char)*(actualSize-itr)));
                     strncpy(realFilename,(char*) &dirFileName[itr+1], actualSize-itr);
                     realFilename[actualSize-itr-1] = '\0'; 
-                    tokenList = split(fileTokens, realFilename);
+                    wordList = split(fileTokens, realFilename);
                 }
 
-                int amount = tokenList->tok_amount;
-                char* filename = tokenList->filename;
+                int amount = wordList->wrd_amount;
+                char* filename = wordList->filename;
 
                 int i;
                 for(i=0; i<amount; i++){
-                    char* token = tokenList->unsort_tokens[i];
-                    addToken(token, filename);        
+                    char* word = wordList->unsort_words[i];
+                    addToken(word, filename);        
                 }
                
                 FILE* outputFile = fopen(indexFileName, "w+");
                 writeToXML(outputFile);
 
-                //delete the token list
-                for(i=0; i<tokenList->tok_amount; i++){
-                    free(tokenList->unsort_tokens[i]);
+                //delete the word list
+                for(i=0; i<wordList->wrd_amount; i++){
+                    free(wordList->unsort_words[i]);
                 }
-                free(tokenList->filename);
-                free(tokenList);
+                free(wordList->filename);
+                free(wordList);
 
             }
         }
@@ -717,7 +760,7 @@ else{
         }
 
         //if the directory was able to be read, read dir
-        listdir(dirFileName,0);
+        findDirectories(dirFileName,0);
 
         FILE* outputFile = fopen(indexFileName, "w+");
         writeToXML(outputFile);
@@ -727,31 +770,31 @@ else{
    //loop through alphabet
     int i = -1;
     for(i=0; i<26; i++){
-        //loop through tokens in hashtable
-        HashToken* itr = NULL;
-        itr = token_table[i]; 
+        //loop through words in hashtable
+        hashID* itr = NULL;
+        itr = hashTable[i]; 
         while(itr!=NULL){
             
-            //loop through files in each token
-            FileData* ptr = itr->head_fd;
+            //loop through files in each word
+            fData* ptr = itr->parent_fData;
             while(ptr!=NULL){
                 //point pointer to the dying node 
-                FileData* orphan = ptr;
+                fData* orphan = ptr;
                 //increment pointer
                 ptr=ptr->next_fd;
 
                 free(orphan->filename);
-                free(orphan->token);
+                free(orphan->word);
                 free(orphan);
             }
 
             //create a reference to the soon to be dead node
-            HashToken* hashOrphan = itr;
+            hashID* hashOrphan = itr;
             //push the itr var forward to keep looping through
             itr=itr->next;
             
-            free(hashOrphan->token);
-//              free(hashOrphan->head_fd);
+            free(hashOrphan->word);
+//              free(hashOrphan->parent_fData);
             free(hashOrphan);
         }
     }
